@@ -400,3 +400,4 @@ func generateCompressedCPIO(files []fileEntry) ([]byte, error) {
 
 	return compressedBuffer.Bytes(), nil
 }
+

@@ -61,6 +61,10 @@ var Options struct {
 	// OSImagesRequestQueryParams contains a JSON encoded representation of any
 	// query parameters to be sent with every request to download an OS image.
 	OSImagesRequestQueryParams string `envconfig:"OS_IMAGES_REQUEST_QUERY_PARAMS" default:""`
+
+	RemoteOVEImages          bool  `envconfig:"REMOTE_OVE_IMAGES" default:"false"`
+	HTTPChunkSize            int64 `envconfig:"HTTP_CHUNK_SIZE" default:"32768"`
+	MaxConcurrentOVERequests int64 `envconfig:"MAX_CONCURRENT_OVE_REQUESTS" default:"50"`
 }
 
 func unmarshallJSONMap(jsonMap string) (map[string]string, error) {
@@ -126,7 +130,9 @@ func main() {
 		Options.OSImageDownloadTrustedCAFile,
 		osImageDownloadHeadersMap,
 		osImageDownloadQueryParamsMap,
-		nmstateHandler)
+		nmstateHandler,
+		Options.RemoteOVEImages,
+		Options.HTTPChunkSize)
 
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
@@ -158,7 +164,7 @@ func main() {
 		log.Fatalf("Failed to create AssistedServiceClient: %v\n", err)
 	}
 
-	imageHandler := handlers.NewImageHandler(is, asc, Options.MaxConcurrentRequests, mdw)
+	imageHandler := handlers.NewImageHandler(is, asc, Options.MaxConcurrentRequests, Options.MaxConcurrentOVERequests, mdw)
 	imageHandler = readinessHandler.WithMiddleware(imageHandler)
 	if Options.AllowedDomains != "" {
 		imageHandler = handlers.WithCORSMiddleware(imageHandler, Options.AllowedDomains)

@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	metricsmiddleware "github.com/slok/go-http-metrics/middleware"
 	stdmiddleware "github.com/slok/go-http-metrics/middleware/std"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
@@ -22,7 +23,9 @@ type ImageHandler struct {
 	s390xInitrdAddrsize http.Handler
 }
 
-func NewImageHandler(is imagestore.ImageStore, assistedServiceClient *AssistedServiceClient, maxRequests int64, mdw metricsmiddleware.Middleware) http.Handler {
+func NewImageHandler(is imagestore.ImageStore, assistedServiceClient *AssistedServiceClient, maxRequests int64, maxOVERequests int64, mdw metricsmiddleware.Middleware) http.Handler {
+	oveSem := semaphore.NewWeighted(maxOVERequests)
+	
 	h := ImageHandler{
 		long: stdmiddleware.Handler("/images/:imageID", mdw,
 			&isoHandler{
@@ -30,6 +33,7 @@ func NewImageHandler(is imagestore.ImageStore, assistedServiceClient *AssistedSe
 				GenerateImageStream: isoeditor.NewRHCOSStreamReader,
 				client:              assistedServiceClient,
 				urlParser:           parseLongURL,
+				oveSem:              oveSem,
 			},
 		),
 		byAPIKey: stdmiddleware.Handler("/byapikey/:token", mdw,
@@ -38,6 +42,7 @@ func NewImageHandler(is imagestore.ImageStore, assistedServiceClient *AssistedSe
 				GenerateImageStream: isoeditor.NewRHCOSStreamReader,
 				client:              assistedServiceClient,
 				urlParser:           parseShortURL,
+				oveSem:              oveSem,
 			},
 		),
 		byID: stdmiddleware.Handler("/byid/:token", mdw,
@@ -46,6 +51,7 @@ func NewImageHandler(is imagestore.ImageStore, assistedServiceClient *AssistedSe
 				GenerateImageStream: isoeditor.NewRHCOSStreamReader,
 				client:              assistedServiceClient,
 				urlParser:           parseShortURL,
+				oveSem:              oveSem,
 			},
 		),
 		byToken: stdmiddleware.Handler("/bytoken/:token", mdw,
@@ -54,6 +60,7 @@ func NewImageHandler(is imagestore.ImageStore, assistedServiceClient *AssistedSe
 				GenerateImageStream: isoeditor.NewRHCOSStreamReader,
 				client:              assistedServiceClient,
 				urlParser:           parseShortURL,
+				oveSem:              oveSem,
 			},
 		),
 		initrd: stdmiddleware.Handler("/images/:imageID/pxe-initrd", mdw,

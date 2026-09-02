@@ -11,7 +11,7 @@ import (
 // This can be used to overwrite the ignition image file of an ISO previously
 // unpacked by Extract() in order to embed ignition data.
 func NewIgnitionImageReader(isoPath string, ignitionContent *IgnitionContent) ([]FileData, error) {
-	info, iso, err := ignitionOverlay(isoPath, ignitionContent, true)
+	info, iso, err := ignitionOverlay(isoPath, nil, ignitionContent, true, nil)
 	if err != nil {
 		return nil, err
 	}

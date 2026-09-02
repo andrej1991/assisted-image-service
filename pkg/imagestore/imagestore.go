@@ -12,7 +12,9 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	"github.com/diskfs/go-diskfs"
 	"github.com/google/renameio"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -21,6 +23,7 @@ import (
 
 	"github.com/openshift/assisted-image-service/internal/common"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
+	"github.com/openshift/assisted-image-service/pkg/overlay"
 )
 
 // OSImage describes an OS image entry from OS_IMAGES / RHCOS_VERSIONS JSON.
@@ -85,8 +88,12 @@ var DefaultVersions = []OSImage{
 type ImageStore interface {
 	Populate(ctx context.Context) error
 	PathForParams(imageType, version, arch string) string
+	URLForParams(imageType, version, arch string) string
 	HaveVersion(version, arch string) bool
 	NmstatectlPathForParams(openshiftVersion, arch string) (string, bool, error)
+	GetOVEOffsets(version, arch string) *isoeditor.OVEOffsets
+	HTTPChunkSize() int64
+	CreateHTTPReader(url string) (io.ReadSeekCloser, error)
 }
 
 type rhcosStore struct {
@@ -98,6 +105,20 @@ type rhcosStore struct {
 	osImageDownloadHeadersMap     map[string]string
 	osImageDownloadQueryParamsMap map[string]string
 	nmstateHandler                isoeditor.NmstateHandler
+	remoteOVEImages               bool
+	httpChunkSize                 int64
+	mu                            sync.Mutex
+	oveOffsetsCache               map[string]map[string]OVEOffsets // nested map: arch -> version -> OVEOffsets
+}
+
+type OffsetLength struct {
+	Offset int64
+	Length int64
+}
+
+type OVEOffsets struct {
+	Ignition OffsetLength
+	Kargs    map[string]OffsetLength
 }
 
 const (
@@ -114,7 +135,7 @@ const (
 )
 
 func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, insecureSkipVerify bool, versions []OSImage,
-	osImageDownloadTrustedCAFile string, osImageDownloadHeadersMap map[string]string, osImageDownloadQueryParamsMap map[string]string, nmstateHandler isoeditor.NmstateHandler) (ImageStore, error) {
+	osImageDownloadTrustedCAFile string, osImageDownloadHeadersMap map[string]string, osImageDownloadQueryParamsMap map[string]string, nmstateHandler isoeditor.NmstateHandler, remoteOVEImages bool, httpChunkSize int64) (ImageStore, error) {
 	if err := validateVersions(versions); err != nil {
 		return nil, err
 	}
@@ -157,6 +178,9 @@ func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, ins
 		osImageDownloadHeadersMap:     osImageDownloadHeadersMap,
 		osImageDownloadQueryParamsMap: osImageDownloadQueryParamsMap,
 		nmstateHandler:                nmstateHandler,
+		remoteOVEImages:               remoteOVEImages,
+		httpChunkSize:                 httpChunkSize,
+		oveOffsetsCache:               make(map[string]map[string]OVEOffsets),
 	}, nil
 }
 
@@ -308,6 +332,20 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 			}
 
 			fullPath := filepath.Join(s.dataDir, isoFileName(imageType, imageVersion, arch))
+
+			if s.remoteOVEImages && imageType == ImageTypeDisconnectedIso {
+				log.Infof("Skipping download for remote OVE image %s-%s, caching offsets via HTTP stream", imageVersion, arch)
+				url := imageInfo.URL
+				
+				// Fetch offsets over HTTP and cache them
+				err := s.cacheOVEOffsets(url, imageVersion, arch)
+				if err != nil {
+					return fmt.Errorf("failed to cache offsets for remote OVE image %s: %v", url, err)
+				}
+				
+				return nil
+			}
+
 			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 				url := imageInfo.URL
 				log.Infof("Downloading iso from %s to %s", url, fullPath)
@@ -563,6 +601,90 @@ func (s *rhcosStore) findVersionEntry(versionKey, arch string) *OSImage {
 	return nil
 }
 
+func (s *rhcosStore) findVersionEntryForType(versionKey, arch, imageType string) *OSImage {
+	for i := range s.versions {
+		entry := &s.versions[i]
+		if entry.CPUArchitecture != arch {
+			continue
+		}
+		t := entry.Type
+		if t == "" {
+			t = ImageTypeFull
+		}
+		if t != imageType {
+			continue
+		}
+		if entry.Version == versionKey {
+			return entry
+		}
+	}
+	for i := range s.versions {
+		entry := &s.versions[i]
+		if entry.CPUArchitecture != arch {
+			continue
+		}
+		t := entry.Type
+		if t == "" {
+			t = ImageTypeFull
+		}
+		if t != imageType {
+			continue
+		}
+		if entry.OpenshiftVersion == versionKey {
+			return entry
+		}
+	}
+	return nil
+}
+
+func (s *rhcosStore) CreateHTTPReader(url string) (io.ReadSeekCloser, error) {
+	return overlay.NewHTTPReader(s.httpClient, url, s.osImageDownloadHeadersMap, s.osImageDownloadQueryParamsMap, s.httpChunkSize)
+}
+
+func (s *rhcosStore) HTTPChunkSize() int64 {
+	return s.httpChunkSize
+}
+
+func (s *rhcosStore) URLForParams(imageType, versionKey, arch string) string {
+	entry := s.findVersionEntryForType(versionKey, arch, imageType)
+	if entry != nil {
+		return entry.URL
+	}
+	return ""
+}
+
+func (s *rhcosStore) GetOVEOffsets(versionKey, arch string) *isoeditor.OVEOffsets {
+	if !s.remoteOVEImages {
+		return nil
+	}
+	entry := s.findVersionEntryForType(versionKey, arch, ImageTypeDisconnectedIso)
+	if entry == nil {
+		return nil
+	}
+	version := entry.Version
+
+	archMap, ok := s.oveOffsetsCache[arch]
+	if !ok {
+		return nil
+	}
+	offsets, ok := archMap[version]
+	if !ok {
+		return nil
+	}
+
+	return &isoeditor.OVEOffsets{
+		IgnitionOffset: offsets.Ignition.Offset,
+		IgnitionLength: offsets.Ignition.Length,
+		Kargs: func() map[string]isoeditor.OffsetLength {
+			res := make(map[string]isoeditor.OffsetLength)
+			for k, v := range offsets.Kargs {
+				res[k] = isoeditor.OffsetLength{Offset: v.Offset, Length: v.Length}
+			}
+			return res
+		}(),
+	}
+}
+
 func (s *rhcosStore) PathForParams(imageType, versionKey, arch string) string {
 	rhcosVersion := versionKey
 	entry := s.findVersionEntry(versionKey, arch)
@@ -651,4 +773,39 @@ func (s *rhcosStore) NmstatectlPathForParams(versionKey, arch string) (string, b
 
 func nmstatectlFileName(version, arch string) string {
 	return fmt.Sprintf("nmstatectl-%s-%s", version, arch)
+}
+
+func (s *rhcosStore) cacheOVEOffsets(url string, version string, arch string) error {
+	reader, err := overlay.NewHTTPReader(s.httpClient, url, s.osImageDownloadHeadersMap, s.osImageDownloadQueryParamsMap, s.httpChunkSize)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+
+	d, err := diskfs.OpenBackend(reader)
+	if err != nil {
+		return err
+	}
+	offsets, err := isoeditor.ExtractOVEOffsetsFromDisk(d)
+	if err != nil {
+		return err
+	}
+
+	// Cache the offsets
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.oveOffsetsCache[arch] == nil {
+		s.oveOffsetsCache[arch] = make(map[string]OVEOffsets)
+	}
+	s.oveOffsetsCache[arch][version] = OVEOffsets{
+		Ignition: OffsetLength{Offset: offsets.IgnitionOffset, Length: offsets.IgnitionLength},
+		Kargs: func() map[string]OffsetLength {
+			res := make(map[string]OffsetLength)
+			for k, v := range offsets.Kargs {
+				res[k] = OffsetLength{Offset: v.Offset, Length: v.Length}
+			}
+			return res
+		}(),
+	}
+	return nil
 }

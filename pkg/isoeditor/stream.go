@@ -18,7 +18,7 @@ type ImageReader = overlay.OverlayReader
 
 type BoundariesFinder func(filePath, isoPath string) (int64, int64, error)
 
-type StreamGeneratorFunc func(isoPath string, ignitionContent *IgnitionContent, ramdiskContent, kargs []byte) (ImageReader, error)
+type StreamGeneratorFunc func(isoPath string, baseReader io.ReadSeekCloser, ignitionContent *IgnitionContent, ramdiskContent, kargs []byte, offsets *OVEOffsets) (ImageReader, error)
 
 type ignitionInfo struct {
 	File   string `json:"file,omitempty"`
@@ -26,8 +26,8 @@ type ignitionInfo struct {
 	Offset int64  `json:"offset,omitempty"`
 }
 
-func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramdiskContent []byte, kargs []byte) (ImageReader, error) {
-	_, r, err := ignitionOverlay(isoPath, ignitionContent, false)
+func NewRHCOSStreamReader(isoPath string, baseReader io.ReadSeekCloser, ignitionContent *IgnitionContent, ramdiskContent []byte, kargs []byte, offsets *OVEOffsets) (ImageReader, error) {
+	_, r, err := ignitionOverlay(isoPath, baseReader, ignitionContent, false, offsets)
 	if err != nil {
 		return nil, err
 	}
@@ -43,12 +43,34 @@ func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramd
 		if kargs[len(kargs)-1] != '\n' {
 			kargs = append(kargs, '\n')
 		}
-		files, err := KargsFiles(isoPath)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to read files to patch for kernel arguments")
+		var files []string
+		var err error
+		if offsets != nil && len(offsets.Kargs) > 0 {
+			for f := range offsets.Kargs {
+				files = append(files, f)
+			}
+		} else {
+			files, err = KargsFiles(isoPath)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to read files to patch for kernel arguments")
+			}
 		}
+
 		for _, file := range files {
-			r, err = readerForKargsContent(isoPath, file, r, bytes.NewReader(kargs))
+			var finder BoundariesFinder
+			if offsets != nil && len(offsets.Kargs) > 0 {
+				off, ok := offsets.Kargs[file]
+				if ok {
+					finder = func(filePath, isoPath string) (int64, int64, error) {
+						return off.Offset, off.Length, nil
+					}
+				}
+			}
+			
+			if finder == nil {
+				finder = createKargsEmbedAreaBoundariesFinder()
+			}
+			r, err = readerForContent(isoPath, file, r, bytes.NewReader(kargs), finder)
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to create overwrite reader for kernel arguments in file \"%s\"", file)
 			}
@@ -58,10 +80,13 @@ func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramd
 	return r, nil
 }
 
-func ignitionOverlay(isoPath string, ignitionContent *IgnitionContent, allowOverflow bool) (*ignitionInfo, overlay.OverlayReader, error) {
-	isoReader, err := os.Open(isoPath)
-	if err != nil {
-		return nil, nil, err
+func ignitionOverlay(isoPath string, baseReader io.ReadSeekCloser, ignitionContent *IgnitionContent, allowOverflow bool, offsets *OVEOffsets) (*ignitionInfo, overlay.OverlayReader, error) {
+	if baseReader == nil {
+		var err error
+		baseReader, err = os.Open(isoPath)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	ignitionReader, err := ignitionContent.Archive()
@@ -74,7 +99,19 @@ func ignitionOverlay(isoPath string, ignitionContent *IgnitionContent, allowOver
 		dataSize:      ignitionReader.Size(),
 	}
 
-	r, err := readerForContent(isoPath, ignitionImagePath, isoReader, ignitionReader, ibf.findBoundaries)
+	var finder BoundariesFinder
+	if offsets != nil && offsets.IgnitionLength > 0 {
+		finder = func(filePath, isoPath string) (int64, int64, error) {
+			ibf.info.File = ignitionImagePath
+			ibf.info.Offset = 0 // Relative offset doesn't matter since we have absolute from cache
+			ibf.info.Length = offsets.IgnitionLength
+			return offsets.IgnitionOffset, offsets.IgnitionLength, nil
+		}
+	} else {
+		finder = ibf.findBoundaries
+	}
+
+	r, err := readerForContent(isoPath, ignitionImagePath, baseReader, ignitionReader, finder)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to create overwrite reader for ignition")
 	}
