@@ -42,6 +42,8 @@ var _ = Describe("ServeHTTP", func() {
 		BeforeEach(func() {
 			ctrl = gomock.NewController(GinkgoT())
 			mockImageStore = imagestore.NewMockImageStore(ctrl)
+mockImageStore.EXPECT().URLForParams(gomock.Any(), gomock.Any(), gomock.Any()).Return("").AnyTimes()
+mockImageStore.EXPECT().GetOVEOffsets(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 			fullImageFile, err := os.CreateTemp("", "iso_handler_test")
 			Expect(err).NotTo(HaveOccurred())
@@ -72,7 +74,8 @@ var _ = Describe("ServeHTTP", func() {
 		})
 
 		mockImage := func(version, imageType, arch string) {
-			mockImageStore.EXPECT().HaveVersion(version, arch).Return(true).AnyTimes()
+			mockImageStore.EXPECT().CreateHTTPReader(gomock.Any()).Return(nil, nil).AnyTimes()
+mockImageStore.EXPECT().HaveVersion(version, arch).Return(true).AnyTimes()
 
 			var imageFile string
 			switch imageType {
@@ -155,7 +158,7 @@ var _ = Describe("ServeHTTP", func() {
 					Expect(err).NotTo(HaveOccurred())
 
 					initrdContent = nil
-					mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+					mockImageStream := func(isoPath string, baseReader io.ReadSeekCloser, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte, kargs []byte, offsets *isoeditor.OVEOffsets) (isoeditor.ImageReader, error) {
 						defer GinkgoRecover()
 						Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 						if isoPath == minImageFilename {
@@ -211,7 +214,8 @@ var _ = Describe("ServeHTTP", func() {
 
 				It("returns a disconnected image with agent-ove filename", func() {
 					initIgnitionHandler("discovery_iso_type=disconnected-iso&file_name=discovery.ign")
-					mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
+					mockImageStore.EXPECT().CreateHTTPReader(gomock.Any()).Return(nil, nil).AnyTimes()
+mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
 					mockImageStore.EXPECT().PathForParams(imagestore.ImageTypeDisconnectedIso, "4.8", defaultArch).Return(fullImageFilename)
 					path := fmt.Sprintf("/byid/%s/4.8/x86_64/disconnected.iso", imageID)
 					setInfraenvKargsHandlerSuccess()
@@ -255,7 +259,8 @@ var _ = Describe("ServeHTTP", func() {
 				})
 
 				It("fails for a non-existant version", func() {
-					mockImageStore.EXPECT().HaveVersion("4.7", defaultArch).Return(false)
+					mockImageStore.EXPECT().CreateHTTPReader(gomock.Any()).Return(nil, nil).AnyTimes()
+mockImageStore.EXPECT().HaveVersion("4.7", defaultArch).Return(false)
 					path := fmt.Sprintf("/byid/%s/4.7/x86_64/full.iso", imageID)
 					resp, err := client.Get(server.URL + path)
 					Expect(err).NotTo(HaveOccurred())
@@ -263,7 +268,8 @@ var _ = Describe("ServeHTTP", func() {
 				})
 
 				It("fails when no type is supplied", func() {
-					mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
+					mockImageStore.EXPECT().CreateHTTPReader(gomock.Any()).Return(nil, nil).AnyTimes()
+mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
 					path := fmt.Sprintf("/byid/%s/4.8/x86_64/", imageID)
 					resp, err := client.Get(server.URL + path)
 					Expect(err).NotTo(HaveOccurred())
@@ -322,7 +328,7 @@ var _ = Describe("ServeHTTP", func() {
 				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
 
-				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+				mockImageStream := func(isoPath string, baseReader io.ReadSeekCloser, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte, kargs []byte, offsets *isoeditor.OVEOffsets) (isoeditor.ImageReader, error) {
 					defer GinkgoRecover()
 					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 					return os.Open(isoPath)
@@ -366,7 +372,7 @@ var _ = Describe("ServeHTTP", func() {
 				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
 
-				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+				mockImageStream := func(isoPath string, baseReader io.ReadSeekCloser, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte, kargs []byte, offsets *isoeditor.OVEOffsets) (isoeditor.ImageReader, error) {
 					defer GinkgoRecover()
 					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 					return os.Open(isoPath)
@@ -406,7 +412,7 @@ var _ = Describe("ServeHTTP", func() {
 				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
 
-				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+				mockImageStream := func(isoPath string, baseReader io.ReadSeekCloser, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte, kargs []byte, offsets *isoeditor.OVEOffsets) (isoeditor.ImageReader, error) {
 					defer GinkgoRecover()
 					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 					return os.Open(isoPath)
@@ -444,7 +450,7 @@ var _ = Describe("ServeHTTP", func() {
 				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
 
-				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+				mockImageStream := func(isoPath string, baseReader io.ReadSeekCloser, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte, kargs []byte, offsets *isoeditor.OVEOffsets) (isoeditor.ImageReader, error) {
 					defer GinkgoRecover()
 					Expect(kargs).To(Equal([]byte(" " + strings.Join(kernelArguments, " ") + "\n")))
 					return os.Open(isoPath)
@@ -490,7 +496,7 @@ var _ = Describe("ServeHTTP", func() {
 				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
 
-				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+				mockImageStream := func(isoPath string, baseReader io.ReadSeekCloser, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte, kargs []byte, offsets *isoeditor.OVEOffsets) (isoeditor.ImageReader, error) {
 					defer GinkgoRecover()
 					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 					return os.Open(isoPath)
@@ -602,7 +608,7 @@ var _ = Describe("ServeHTTP", func() {
 					Expect(err).NotTo(HaveOccurred())
 
 					initrdContent = nil
-					mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+					mockImageStream := func(isoPath string, baseReader io.ReadSeekCloser, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte, kargs []byte, offsets *isoeditor.OVEOffsets) (isoeditor.ImageReader, error) {
 						defer GinkgoRecover()
 						Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 						if isoPath == minImageFilename {
@@ -684,7 +690,8 @@ var _ = Describe("ServeHTTP", func() {
 				})
 
 				It("fails for a non-existant version", func() {
-					mockImageStore.EXPECT().HaveVersion("4.7", defaultArch).Return(false)
+					mockImageStore.EXPECT().CreateHTTPReader(gomock.Any()).Return(nil, nil).AnyTimes()
+mockImageStore.EXPECT().HaveVersion("4.7", defaultArch).Return(false)
 					path := fmt.Sprintf("/images/%s?version=4.7&type=full-iso", imageID)
 					resp, err := client.Get(server.URL + path)
 					Expect(err).NotTo(HaveOccurred())
@@ -699,7 +706,8 @@ var _ = Describe("ServeHTTP", func() {
 				})
 
 				It("fails when no type is supplied", func() {
-					mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
+					mockImageStore.EXPECT().CreateHTTPReader(gomock.Any()).Return(nil, nil).AnyTimes()
+mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
 					path := fmt.Sprintf("/images/%s?version=4.8", imageID)
 					resp, err := client.Get(server.URL + path)
 					Expect(err).NotTo(HaveOccurred())
@@ -758,7 +766,7 @@ var _ = Describe("ServeHTTP", func() {
 				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
 
-				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+				mockImageStream := func(isoPath string, baseReader io.ReadSeekCloser, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte, kargs []byte, offsets *isoeditor.OVEOffsets) (isoeditor.ImageReader, error) {
 					defer GinkgoRecover()
 					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 					return os.Open(isoPath)
@@ -802,7 +810,7 @@ var _ = Describe("ServeHTTP", func() {
 				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
 
-				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+				mockImageStream := func(isoPath string, baseReader io.ReadSeekCloser, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte, kargs []byte, offsets *isoeditor.OVEOffsets) (isoeditor.ImageReader, error) {
 					defer GinkgoRecover()
 					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 					return os.Open(isoPath)
@@ -840,7 +848,7 @@ var _ = Describe("ServeHTTP", func() {
 				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
 
-				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+				mockImageStream := func(isoPath string, baseReader io.ReadSeekCloser, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte, kargs []byte, offsets *isoeditor.OVEOffsets) (isoeditor.ImageReader, error) {
 					defer GinkgoRecover()
 					Expect(kargs).To(Equal([]byte(" " + strings.Join(kernelArguments, " ") + "\n")))
 					return os.Open(isoPath)
@@ -881,7 +889,7 @@ var _ = Describe("ServeHTTP", func() {
 				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
 
-				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+				mockImageStream := func(isoPath string, baseReader io.ReadSeekCloser, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte, kargs []byte, offsets *isoeditor.OVEOffsets) (isoeditor.ImageReader, error) {
 					defer GinkgoRecover()
 					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 					return os.Open(isoPath)

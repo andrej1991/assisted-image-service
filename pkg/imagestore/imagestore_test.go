@@ -181,7 +181,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version.URL = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, caCertFileName, osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, caCertFileName, osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version.Version)
@@ -279,7 +279,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version.URL = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version.Version)
@@ -308,7 +308,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version.URL = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version.Version)
@@ -331,7 +331,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version.URL = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version.Version)
@@ -353,7 +353,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version.URL = ts.URL() + "/fail.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(is.Populate(ctx)).NotTo(Succeed())
@@ -368,7 +368,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version.URL = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(is.Populate(ctx)).NotTo(Succeed())
@@ -385,7 +385,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version.URL = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version.Version)
@@ -403,7 +403,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version.URL = ts.URL() + "/dontcallthis.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
@@ -416,7 +416,7 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("recreates the minimal iso even when it's already present", func() {
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				fullPath := filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso")
@@ -442,7 +442,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				versionPatch.URL = ts.URL() + "/somepatchversion.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{versionPatch}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{versionPatch}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, versionPatch.Version)
@@ -467,7 +467,7 @@ var _ = Context("with a data directory configured", func() {
 						),
 					)
 					versionPatch.URL = ts.URL() + "/somepatchversion.iso"
-					is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{versionPatch}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+					is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{versionPatch}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 					Expect(err).NotTo(HaveOccurred())
 
 					rootfs := fmt.Sprintf(rootfsURL, versionPatch.Version)
@@ -487,7 +487,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version.URL = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				err = is.Populate(ctx)
@@ -510,7 +510,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version.URL = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version.Version)
@@ -531,7 +531,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version.URL = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				err = is.Populate(ctx)
@@ -543,7 +543,7 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("fails when imageServiceBaseURL is not set", func() {
-				is, err := NewImageStore(mockEditor, dataDir, "", false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, "", false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 				nmstatectlPath, _, err := is.NmstatectlPathForParams(version.OpenshiftVersion, version.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
@@ -561,7 +561,7 @@ var _ = Context("with a data directory configured", func() {
 				)
 				version.URL = ts.URL() + "/some.iso"
 				baseURL := ":"
-				is, err := NewImageStore(mockEditor, dataDir, baseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, baseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).ToNot(HaveOccurred())
 
 				rootfs := fmt.Sprintf("https://images.example.com/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version.Version)
@@ -589,7 +589,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{s390xVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{s390xVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Pre-create the cached nmstatectl file to avoid extraction
@@ -623,7 +623,7 @@ var _ = Context("with a data directory configured", func() {
 						),
 					)
 
-					is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{archVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+					is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{archVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 					Expect(err).NotTo(HaveOccurred())
 
 					// Pre-create nmstatectl cache to avoid actual extraction
@@ -659,7 +659,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				oldVersion.URL = ts.URL() + "/old.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{oldVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{oldVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 				Expect(err).NotTo(HaveOccurred())
 
 				nmstatectlPath, _, err := is.NmstatectlPathForParams(oldVersion.OpenshiftVersion, oldVersion.CPUArchitecture)
@@ -682,7 +682,7 @@ var _ = Describe("PathForParams", func() {
 			URL:              "http://example.com/image/x86_64-48.iso",
 			Version:          "48.84.202109241901-0",
 		}}
-		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil, false, 32768)
 		Expect(err).NotTo(HaveOccurred())
 		expected := "/tmp/some/dir/rhcos-full-48.84.202109241901-0-x86_64.iso"
 		Expect(is.PathForParams("full", "4.8", "x86_64")).To(Equal(expected))
@@ -695,7 +695,7 @@ var _ = Describe("PathForParams", func() {
 			URL:              "http://example.com/image/x86_64-48.iso",
 			Version:          "48.84.202109241901-0",
 		}}
-		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil, false, 32768)
 		Expect(err).NotTo(HaveOccurred())
 		expected := "/tmp/some/dir/rhcos-full-48.84.202109241901-0-x86_64.iso"
 		Expect(is.PathForParams("full", "48.84.202109241901-0", "x86_64")).To(Equal(expected))
@@ -719,7 +719,7 @@ var _ = Describe("NmstatectlPathForParams", func() {
 			URL:              "http://example.com/image/x86_64-418.iso",
 			Version:          "418.94.202410010000-0",
 		}}
-		is, err = NewImageStore(nil, dataDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		is, err = NewImageStore(nil, dataDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil, false, 32768)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -781,7 +781,7 @@ var _ = Describe("HaveVersion", func() {
 
 	BeforeEach(func() {
 		var err error
-		store, err = NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		store, err = NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil, false, 32768)
 		Expect(err).NotTo(HaveOccurred())
 	})
 	AfterEach(func() {
@@ -884,13 +884,13 @@ var _ = Describe("NewImageStore", func() {
 				Version:          "48.84.202109241901-0",
 			},
 		}
-		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil, false, 32768)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should error when RHCOS_IMAGES are not set i.e. versions is an empty slice", func() {
 		versions := []OSImage{}
-		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil, false, 32768)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(Equal("invalid versions: must not be empty"))
 
@@ -904,7 +904,7 @@ var _ = Describe("NewImageStore", func() {
 				Version:         "48.84.202109241901-0",
 			},
 		}
-		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil, false, 32768)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -916,7 +916,7 @@ var _ = Describe("NewImageStore", func() {
 				Version:          "48.84.202109241901-0",
 			},
 		}
-		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil, false, 32768)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -928,7 +928,7 @@ var _ = Describe("NewImageStore", func() {
 				Version:          "48.84.202109241901-0",
 			},
 		}
-		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil, false, 32768)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -940,7 +940,7 @@ var _ = Describe("NewImageStore", func() {
 				URL:              "http://example.com/image/x86_64-48.iso",
 			},
 		}
-		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil, false, 32768)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -956,7 +956,7 @@ var _ = Describe("NewImageStore", func() {
 				DefaultOsStream:  &defaultStream,
 			},
 		}
-		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil, false, 32768)
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
@@ -1132,7 +1132,7 @@ var _ = Context("cleanDataDir", func() {
 			},
 		}
 
-		is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil, false, 32768)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Create expected files
@@ -1265,7 +1265,7 @@ var _ = Describe("Populate with disconnected ISO", func() {
 				),
 			)
 
-			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{disconnectedVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{disconnectedVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 			Expect(err).NotTo(HaveOccurred())
 
 			err = is.Populate(ctx)
@@ -1285,7 +1285,7 @@ var _ = Describe("Populate with disconnected ISO", func() {
 				Type:             "invalid-type",
 			}
 
-			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{invalidVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{invalidVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler, false, 32768)
 			Expect(err).NotTo(HaveOccurred())
 
 			err = is.Populate(ctx)

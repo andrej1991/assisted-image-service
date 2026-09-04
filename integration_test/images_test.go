@@ -208,7 +208,7 @@ var _ = Describe("Image integration tests", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				mdw := middleware.New(middleware.Config{})
-				imageServer = httptest.NewServer(handlers.NewImageHandler(imageStore, asc, 1, mdw))
+				imageServer = httptest.NewServer(handlers.NewImageHandler(imageStore, asc, 1, 50, mdw))
 				imageClient = imageServer.Client()
 			})
 
@@ -319,7 +319,7 @@ var _ = Describe("Image integration tests", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				mdw := middleware.New(middleware.Config{})
-				imageServer = httptest.NewServer(handlers.NewImageHandler(imageStore, asc, 1, mdw))
+				imageServer = httptest.NewServer(handlers.NewImageHandler(imageStore, asc, 1, 50, mdw))
 				imageClient = imageServer.Client()
 			})
 			AfterEach(func() {
@@ -371,7 +371,7 @@ var _ = BeforeSuite(func() {
 	executer := &isoeditor.CommonExecuter{}
 	nmstatectlExtractorFactory := isoeditor.NewNmstatectlExtractorFactory(executer)
 	nmstateHandler := isoeditor.NewNmstateHandler(imageDir, executer, nmstatectlExtractorFactory)
-	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir, nmstateHandler), imageDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nmstateHandler)
+	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir, nmstateHandler), imageDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nmstateHandler, false, 32768)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = imageStore.Populate(context.Background())

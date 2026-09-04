@@ -118,10 +118,13 @@ func (h *isoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fileName = fmt.Sprintf("agent-ove.%s.iso", params.arch)
 	}
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
+	w.Header().Set("Content-Type", "application/octet-stream")
 	modTime, err := http.ParseTime(lastModified)
 	if err != nil {
 		log.Warnf("Error parsing last modified time %s: %v", lastModified, err)
 		modTime = time.Now()
 	}
+	log.Infof("Starting http.ServeContent for %s", fileName)
 	http.ServeContent(w, r, fileName, modTime, isoReader)
+	log.Infof("Finished http.ServeContent for %s", fileName)
 }

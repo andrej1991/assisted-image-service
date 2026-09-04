@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/diskfs/go-diskfs/backend"
+	log "github.com/sirupsen/logrus"
 )
 
 type HTTPReader struct {
@@ -19,9 +20,16 @@ type HTTPReader struct {
 	queryParams map[string]string
 	length      int64
 	offset      int64
-	chunkSize   int64
-	buffer      []byte
-	bufferOff   int64
+
+	streamBody   io.ReadCloser
+	streamOffset int64
+
+	streamOpenedAt  time.Time
+	streamBytesRead int64
+
+	chunkSize int64
+	buffer    []byte
+	bufferOff int64
 }
 
 // Interface checks
@@ -33,7 +41,7 @@ func NewHTTPReader(client *http.Client, url string, headers map[string]string, q
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
@@ -66,15 +74,17 @@ func NewHTTPReader(client *http.Client, url string, headers map[string]string, q
 	}
 
 	return &HTTPReader{
-		client:      client,
-		url:         url,
-		headers:     headers,
-		queryParams: queryParams,
-		length:      length,
-		offset:      0,
-		chunkSize:   chunkSize,
-		buffer:      nil,
-		bufferOff:   -1,
+		client:       client,
+		url:          url,
+		headers:      headers,
+		queryParams:  queryParams,
+		length:       length,
+		offset:       0,
+		streamBody:   nil,
+		streamOffset: -1,
+		chunkSize:    chunkSize,
+		buffer:       nil,
+		bufferOff:    -1,
 	}, nil
 }
 
@@ -86,17 +96,67 @@ func (h *HTTPReader) Read(p []byte) (n int, err error) {
 	if h.offset+int64(len(p)) > h.length {
 		p = p[:h.length-h.offset]
 	}
-	if h.buffer == nil || h.offset < h.bufferOff || h.offset >= h.bufferOff+int64(len(h.buffer)) {
-		err := h.fetchChunk(h.offset)
+
+	if h.streamBody == nil || h.streamOffset != h.offset {
+		if h.streamBody != nil {
+			duration := time.Since(h.streamOpenedAt)
+			speed := 0.0
+			if duration.Seconds() > 0 {
+				speed = float64(h.streamBytesRead) / 1024 / 1024 / duration.Seconds()
+			}
+			log.Infof("HTTPReader: closed stream for %s after %s, read %d bytes (%.2f MB/s)", h.url, duration, h.streamBytesRead, speed)
+			h.streamBody.Close()
+			h.streamBody = nil
+		}
+
+		req, err := http.NewRequest(http.MethodGet, h.url, nil)
 		if err != nil {
 			return 0, err
 		}
+		for k, v := range h.headers {
+			req.Header.Set(k, v)
+		}
+		if len(h.queryParams) > 0 {
+			q := req.URL.Query()
+			for k, v := range h.queryParams {
+				q.Add(k, v)
+			}
+			req.URL.RawQuery = q.Encode()
+		}
+
+		req.Header.Set("Range", "bytes="+strconv.FormatInt(h.offset, 10)+"-")
+
+		log.Infof("HTTPReader: opening stream for %s at offset %d", h.url, h.offset)
+		start := time.Now()
+		resp, err := h.client.Do(req)
+		elapsed := time.Since(start)
+		log.Infof("HTTPReader: stream opened in %s, status code: %d", elapsed, resp.StatusCode)
+		if err != nil {
+			return 0, err
+		}
+
+		if resp.StatusCode != http.StatusPartialContent && resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return 0, errors.New("unexpected status code opening stream: " + resp.Status)
+		}
+
+		h.streamBody = resp.Body
+		h.streamOffset = h.offset
+		h.streamOpenedAt = time.Now()
+		h.streamBytesRead = 0
+		h.buffer = nil
 	}
 
-	bufStart := h.offset - h.bufferOff
-	n = copy(p, h.buffer[bufStart:])
-	h.offset += int64(n)
-	return n, nil
+	n, err = h.streamBody.Read(p)
+	if n > 0 {
+		h.offset += int64(n)
+		h.streamOffset += int64(n)
+		h.streamBytesRead += int64(n)
+	}
+	if err != nil && err != io.EOF {
+		log.Errorf("HTTPReader: Read error: %v", err)
+	}
+	return n, err
 }
 
 func (h *HTTPReader) ReadAt(p []byte, off int64) (n int, err error) {
@@ -126,7 +186,13 @@ func (h *HTTPReader) ReadAt(p []byte, off int64) (n int, err error) {
 }
 
 func (h *HTTPReader) fetchChunk(offset int64) error {
-	end := offset + h.chunkSize - 1
+	// For ReadAt calls, limit the chunk size to avoid huge allocations
+	actualChunkSize := h.chunkSize
+	if actualChunkSize > 1024*1024 {
+		actualChunkSize = 1024*1024
+	}
+
+	end := offset + actualChunkSize - 1
 	if end >= h.length {
 		end = h.length - 1
 	}
@@ -189,6 +255,16 @@ func (h *HTTPReader) Seek(offset int64, whence int) (int64, error) {
 
 func (h *HTTPReader) Close() error {
 	h.buffer = nil
+	if h.streamBody != nil {
+		duration := time.Since(h.streamOpenedAt)
+		speed := 0.0
+		if duration.Seconds() > 0 {
+			speed = float64(h.streamBytesRead) / 1024 / 1024 / duration.Seconds()
+		}
+		log.Infof("HTTPReader: closed stream for %s after %s, read %d bytes (%.2f MB/s)", h.url, duration, h.streamBytesRead, speed)
+		h.streamBody.Close()
+		h.streamBody = nil
+	}
 	return nil
 }
 

@@ -62,7 +62,7 @@ var Options struct {
 	// query parameters to be sent with every request to download an OS image.
 	OSImagesRequestQueryParams string `envconfig:"OS_IMAGES_REQUEST_QUERY_PARAMS" default:""`
 
-	RemoteOVEImages          bool  `envconfig:"REMOTE_OVE_IMAGES" default:"false"`
+	RemoteOVEImages          bool  `envconfig:"REMOTE_OVE_IMAGES" default:"true"`
 	HTTPChunkSize            int64 `envconfig:"HTTP_CHUNK_SIZE" default:"32768"`
 	MaxConcurrentOVERequests int64 `envconfig:"MAX_CONCURRENT_OVE_REQUESTS" default:"50"`
 }
@@ -84,6 +84,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to process config: %v\n", err)
 	}
+
+	log.Infof("Remote OVE Images enabled: %v", Options.RemoteOVEImages)
+	log.Infof("HTTP Chunk Size: %d bytes", Options.HTTPChunkSize)
+	log.Infof("Max Concurrent OVE Requests: %d", Options.MaxConcurrentOVERequests)
 	if Options.AssistedServiceApiTrustedCAFile == "" {
 		Options.AssistedServiceApiTrustedCAFile = Options.HTTPSCAFile
 	}

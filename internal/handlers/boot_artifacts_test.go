@@ -48,7 +48,8 @@ var _ = Describe("ServeHTTP", func() {
 		})
 
 		mockImage := func(version, imageType, arch string) {
-			mockImageStore.EXPECT().HaveVersion(version, arch).Return(true).AnyTimes()
+			mockImageStore.EXPECT().CreateHTTPReader(gomock.Any()).Return(nil, nil).AnyTimes()
+mockImageStore.EXPECT().HaveVersion(version, arch).Return(true).AnyTimes()
 			imageFile := fullImageFilename
 			mockImageStore.EXPECT().PathForParams(imageType, version, arch).Return(imageFile).AnyTimes()
 		}
@@ -112,7 +113,8 @@ var _ = Describe("ServeHTTP", func() {
 
 		It("fails for a non-existent version", func() {
 			mockImageStore.EXPECT().PathForParams(imagestore.ImageTypeFull, "4.7", defaultArch).Return("").AnyTimes()
-			mockImageStore.EXPECT().HaveVersion("4.7", defaultArch).Return(false)
+			mockImageStore.EXPECT().CreateHTTPReader(gomock.Any()).Return(nil, nil).AnyTimes()
+mockImageStore.EXPECT().HaveVersion("4.7", defaultArch).Return(false)
 			path := fmt.Sprintf("/boot-artifacts/%s?version=4.7", rootfsArtifact)
 			resp, err := client.Get(server.URL + path)
 			Expect(err).NotTo(HaveOccurred())
@@ -127,7 +129,8 @@ var _ = Describe("ServeHTTP", func() {
 		})
 
 		It("fails when no artifact is supplied", func() {
-			mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
+			mockImageStore.EXPECT().CreateHTTPReader(gomock.Any()).Return(nil, nil).AnyTimes()
+mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
 			path := "/boot-artifacts/?version=4.8"
 			resp, err := client.Get(server.URL + path)
 			Expect(err).NotTo(HaveOccurred())

@@ -117,15 +117,21 @@ func ignitionOverlay(isoPath string, baseReader io.ReadSeekCloser, ignitionConte
 	}
 
 	if ibf.info.Length > ibf.dataSize {
-		offset, _, err := GetISOFileInfo(ibf.info.File, isoPath)
-		if err != nil {
-			r.Close()
-			return nil, nil, err
+		var baseOffset int64
+		if offsets != nil && offsets.IgnitionLength > 0 {
+			baseOffset = offsets.IgnitionOffset
+		} else {
+			offset, _, err := GetISOFileInfo(ibf.info.File, isoPath)
+			if err != nil {
+				r.Close()
+				return nil, nil, err
+			}
+			baseOffset = offset + ibf.info.Offset
 		}
 		paddingLen := ibf.info.Length - ibf.dataSize
 		paddingOverlay := overlay.Overlay{
-			Reader: bytes.NewReader(bytes.Repeat([]byte{0}, int(paddingLen))),
-			Offset: offset + ibf.info.Offset + ibf.dataSize,
+			Reader: &zeroReader{length: paddingLen},
+			Offset: baseOffset + ibf.dataSize,
 			Length: paddingLen,
 		}
 		if r2, err := overlay.NewOverlayReader(r, paddingOverlay); err == nil {
@@ -136,6 +142,48 @@ func ignitionOverlay(isoPath string, baseReader io.ReadSeekCloser, ignitionConte
 		}
 	}
 	return &ibf.info, r, nil
+}
+
+
+type zeroReader struct {
+	length int64
+	offset int64
+}
+
+func (z *zeroReader) Read(p []byte) (n int, err error) {
+	if z.offset >= z.length {
+		return 0, io.EOF
+	}
+
+	n = len(p)
+	if z.offset+int64(n) > z.length {
+		n = int(z.length - z.offset)
+	}
+	for i := 0; i < n; i++ {
+		p[i] = 0
+	}
+	z.offset += int64(n)
+	return n, nil
+}
+
+func (z *zeroReader) Seek(offset int64, whence int) (int64, error) {
+	var newOffset int64
+	switch whence {
+	case io.SeekStart:
+		newOffset = offset
+	case io.SeekCurrent:
+		newOffset = z.offset + offset
+	case io.SeekEnd:
+		newOffset = z.length + offset
+	default:
+		return 0, errors.New("invalid whence")
+	}
+
+	if newOffset < 0 {
+		return 0, errors.New("negative seek offset")
+	}
+	z.offset = newOffset
+	return newOffset, nil
 }
 
 type ignitionBoundaryFinder struct {
